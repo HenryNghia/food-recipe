@@ -2,26 +2,28 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\Category;
 use App\Models\Recipe;
 use Exception;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
+use Psy\Readline\Hoa\Console;
 
 class RecipeController extends Controller
 {
     public function GetData()
     {
-        // lấy ra danh mục
-        $data = Recipe::join('accounts', 'accounts.id', 'recipes.user.id')
-        ->select(
-            'accounts.user_name',
-            'title',
-            'description',
-            'ingredients',
-            'instructions',
-            'image',
-            'category',
-        )->get();
+        // lấy ra
+        $data = Recipe::join('accounts', 'accounts.id', 'recipes.user_id')
+            ->join('categories', 'categories.id', 'recipes.id_category')
+            ->join('levels', 'levels.id', 'recipes.id_level')
+            ->select(
+                'accounts.user_name',
+                'categories.name_category',
+                'levels.name_level',
+                'recipes.*',
+            )->get();
+
         if ($data) {
             return response()->json(
                 [
@@ -45,7 +47,8 @@ class RecipeController extends Controller
         $key = "%" . $request->abc . "%";
 
         $data = Recipe::join('accounts', 'accounts.id', 'recipes.user_id')
-                        ->join('levels' , 'levels.id', 'recipes.id_level')
+            ->join('levels', 'levels.id', 'recipes.id_level')
+            ->join('categories', 'categories.id, recipes.id_category')
             ->where('title', 'like', $key)
             ->select(
                 'id',
@@ -55,7 +58,7 @@ class RecipeController extends Controller
                 'ingredients',
                 'instructions',
                 'image',
-                'category',
+                'categories.name_category',
                 'levels.name_level',
                 'time_cook',
             )
@@ -82,7 +85,6 @@ class RecipeController extends Controller
     {
         try {
             Recipe::create([
-                'name_category' => $request->name_category,
                 'image' => $request->image,
                 'user_id' => $request->user_id,
                 'title' => $request->title,
@@ -90,7 +92,7 @@ class RecipeController extends Controller
                 'ingredients' => $request->ingredients,
                 'instructions' => $request->instructions,
                 'image' => $request->image,
-                'category' => $request->category,
+                'id_category' => $request->id_category,
                 'id_level' => $request->id_level,
                 'time_cook' => $request->time_cook,
             ]);
@@ -119,7 +121,7 @@ class RecipeController extends Controller
                     'ingredients' => $request->ingredients,
                     'instructions' => $request->instructions,
                     'image' => $request->image,
-                    'category' => $request->category,
+                    'id_category' => $request->id_category,
                     'id_level' => $request->id_level,
                     'time_cook' => $request->time_cook,
                 ]);

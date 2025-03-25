@@ -8,7 +8,8 @@ use Illuminate\Database\Eloquent\Model;
 class Recipe extends Model
 {
     use HasFactory;
-    protected $table = 'recpies';
+
+    protected $table = 'recipes';
 
     protected $fillable = [
         'user_id',
@@ -17,7 +18,7 @@ class Recipe extends Model
         'ingredients',
         'instructions',
         'image',
-        'category',
+        'id_category',
         'id_level',
         'timecook',
     ];
