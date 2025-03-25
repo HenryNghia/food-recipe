@@ -15,12 +15,11 @@ return new class extends Migration
             $table->id();
             $table->integer('user_id');
             $table->string('title');
-            $table->string('description');
-            $table->string('ingredients');
-            $table->string('instructions');
+            $table->text('description');
+            $table->text('ingredients');
+            $table->text('instructions');
             $table->string('image');
-            $table->string('category');
-            $table->string('id_roles');
+            $table->integer('id_category');
             $table->integer('id_level');
             $table->string('timecook');
             $table->timestamps();
