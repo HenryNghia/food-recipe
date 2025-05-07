@@ -6,6 +6,7 @@ use App\Models\Category;
 use App\Models\Recipe;
 use Exception;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Log;
 use Psy\Readline\Hoa\Console;
 
@@ -13,17 +14,22 @@ class RecipeController extends Controller
 {
     public function GetData()
     {
-        // lấy ra
-        $data = Recipe::join('accounts', 'accounts.id', 'recipes.user_id')
+        $data = Recipe::join('users', 'users.id', 'recipes.user_id')
             ->join('categories', 'categories.id', 'recipes.id_category')
             ->join('levels', 'levels.id', 'recipes.id_level')
             ->select(
-                'accounts.user_name',
+                'users.name',
+                'users.avatar',
                 'categories.name_category',
                 'levels.name_level',
                 'recipes.*',
             )->get();
-
+        $data = $data->map(function ($item) {
+            $item->description = $item->description ? explode('\\', $item->description) : [];
+            $item->instructions = $item->instructions ? explode('\\', $item->instructions) : [];
+            $item->ingredients = $item->ingredients ? explode(',', $item->ingredients) : [];
+            return $item;
+        });
         if ($data) {
             return response()->json(
                 [
@@ -42,25 +48,61 @@ class RecipeController extends Controller
         );
     }
 
+    public function GetDataById($id)
+    {
+        $data = Recipe::where('recipes.id', '=', $id) // *** QUAN TRỌNG: Lọc theo ID của công thức ***
+            ->join('users', 'users.id', 'recipes.user_id')
+            ->join('levels', 'levels.id', 'recipes.id_level')
+            ->join('categories', 'categories.id',  'recipes.id_category')
+            ->select(
+                'users.name',
+                'users.avatar',
+                'categories.name_category',
+                'levels.name_level',
+                'recipes.*',
+            )
+            ->first();
+
+        if ($data) {
+            // ✅ Chuyển các trường thành mảng nếu cần
+            $data->description = $data->description ? explode('\\', $data->description) : [];
+            $data->instructions = $data->instructions ? explode('\\', $data->instructions) : [];
+            $data->ingredients = $data->ingredients ? explode(',', $data->ingredients) : [];
+
+            return response()->json([
+                'status' => 200,
+                'data' => $data,
+                'message' => 'Recipe found successfully.'
+            ], 200);
+        } else {
+            return response()->json([
+                'status' => 404,
+                'message' => 'Recipe not found.'
+            ], 404);
+        }
+    }
+
     public function SearchData(Request $request)
     {
         $key = "%" . $request->abc . "%";
-
-        $data = Recipe::join('accounts', 'accounts.id', 'recipes.user_id')
+        $categoryId = $request->id;
+        $data = Recipe::join('users', 'users.id', 'recipes.user_id')
             ->join('levels', 'levels.id', 'recipes.id_level')
-            ->join('categories', 'categories.id, recipes.id_category')
+            ->join('categories', 'categories.id', 'recipes.id_category')
             ->where('title', 'like', $key)
+            ->where('recipes.id_category', $categoryId)
             ->select(
-                'id',
-                'accounts.user_name',
+                'recipes.id',
+                'users.name',
                 'title',
                 'description',
                 'ingredients',
                 'instructions',
-                'image',
+                'recipes.image',
                 'categories.name_category',
                 'levels.name_level',
-                'time_cook',
+                'rating',
+                'timecook',
             )
             ->get();
         if ($data) {
@@ -68,19 +110,57 @@ class RecipeController extends Controller
                 [
                     'status' => 200,
                     'data' => $data,
-                    'message' => 'search success'
+                    'message' => 'Tìm kiếm thành công'
                 ]
             );
         }
         return response()->json(
             [
                 'status' => 404,
-                'message' => 'not found data'
-            ],
-            404
-        );
+                'message' => 'Công thưc không tồn tại'
+            ]);
     }
 
+    // tìm kiếm tất cả công thức
+    public function SearchDataALL(Request $request)
+    {
+        $keyword = "%" . $request->abc . "%";
+
+        $data = Recipe::join('users', 'users.id', 'recipes.user_id')
+            ->join('levels', 'levels.id', 'recipes.id_level')
+            ->join('categories', 'categories.id', 'recipes.id_category')
+            ->where(function ($query) use ($keyword) {
+                $query->where('recipes.title', 'like', $keyword)
+                    ->orWhere('categories.name_category', 'like', $keyword);
+            })
+            ->select(
+                'recipes.id',
+                'users.name',
+                'title',
+                'description',
+                'ingredients',
+                'instructions',
+                'recipes.image',
+                'categories.name_category',
+                'levels.name_level',
+                'rating',
+                'timecook',
+            )
+            ->get();
+
+        if ($data->isNotEmpty()) {
+            return response()->json([
+                'status' => 200,
+                'data' => $data,
+                'message' => 'Tìm kiếm thành công'
+            ]);
+        }
+
+        return response()->json([
+            'status' => 404,
+            'message' => 'Cong thức không tồn tại'
+        ]);
+    }
     public function CreateData(Request $request)
     {
         try {
@@ -94,7 +174,7 @@ class RecipeController extends Controller
                 'image' => $request->image,
                 'id_category' => $request->id_category,
                 'id_level' => $request->id_level,
-                'time_cook' => $request->time_cook,
+                'timecook' => $request->time_cook,
             ]);
 
             return response()->json([
@@ -123,7 +203,7 @@ class RecipeController extends Controller
                     'image' => $request->image,
                     'id_category' => $request->id_category,
                     'id_level' => $request->id_level,
-                    'time_cook' => $request->time_cook,
+                    'timecook' => $request->time_cook,
                 ]);
         } catch (Exception $e) {
             Log::info("error", $e);
@@ -148,6 +228,80 @@ class RecipeController extends Controller
                 'status'            =>   404,
                 'message'           =>   'error',
             ]);
+        }
+    }
+
+    //lấy công thức theo danh mục chọn
+    public function GetDataByCategory($categoryId)
+    {
+        $data = Recipe::join('users', 'users.id', 'recipes.user_id')
+            ->join('categories', 'categories.id', 'recipes.id_category')
+            ->join('levels', 'levels.id', 'recipes.id_level')
+            ->where('recipes.id_category', $categoryId)
+            ->select(
+                'users.name',
+                'users.avatar',
+                'categories.name_category',
+                'levels.name_level',
+                'recipes.*',
+            )
+            ->orderBy('recipes.created_at', 'desc')
+            ->get();
+        $data = $data->map(function ($item) {
+            $item->description = $item->description ? explode('\\', $item->description) : [];
+            $item->instructions = $item->instructions ? explode('\\', $item->instructions) : [];
+            $item->ingredients = $item->ingredients ? explode(',', $item->ingredients) : [];
+            return $item;
+        });
+        if ($data) {
+            return response()->json(
+                [
+                    'status' => 200,
+                    'data' => $data,
+                    'message' => 'success'
+                ]
+            );
+        }
+        return response()->json(
+            [
+                'status' => 404,
+                'message' => 'Không tìm thấy dữ liệu'
+            ],
+            404
+        );
+    }
+    // lấy công thức theo cấp độ chọn
+    public function getSearchSuggestions(Request $request)
+    {
+        $keyword = $request->input('keyword', '');
+
+        if (empty($keyword)) {
+            return response()->json([
+                'status' => 200,
+                'data' => [],
+                'message' => 'Empty keyword'
+            ]);
+        }
+
+        try {
+            $suggestions = Recipe::where('title', 'like', '%' . $keyword . '%')
+                ->select('title')
+                ->distinct()
+                ->limit(5) // Giới hạn 5 gợi ý
+                ->get()
+                ->pluck('title'); // Lấy ra mảng các title
+
+            return response()->json([
+                'status' => 200,
+                'data' => $suggestions,
+                'message' => 'Suggestions retrieved successfully'
+            ]);
+        } catch (Exception $e) {
+            Log::error("Error getting search suggestions: " . $e->getMessage());
+            return response()->json([
+                'status' => 500,
+                'message' => 'Error retrieving suggestions'
+            ], 500);
         }
     }
 }

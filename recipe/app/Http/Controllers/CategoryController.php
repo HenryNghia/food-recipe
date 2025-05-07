@@ -12,7 +12,7 @@ class CategoryController extends Controller
     public function GetData()
     {
         // lấy ra danh mục
-        $data = Category::select('name_category', 'image')->get();
+        $data = Category::get();
         if ($data) {
             return response()->json(
                 [

@@ -4,62 +4,79 @@ namespace App\Http\Controllers;
 
 use App\Models\Favorite;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Auth;
 
 class FavoriteController extends Controller
 {
-    /**
-     * Display a listing of the resource.
-     */
-    public function index()
+    public function GetDataByUser()
+{
+    $user = Auth::guard('sanctum')->user();
+    if ($user) {
+        $favorite = Favorite::where('favorites.user_id', $user->id)
+            ->join('recipes', 'recipes.id', '=', 'favorites.recipe_id')
+            ->join('users as recipe_owner', 'recipe_owner.id', '=', 'recipes.user_id') // alias ở đây
+            ->select(
+                'recipes.id',
+                'recipes.title',
+                'recipes.rating',
+                'recipes.image',
+                'recipe_owner.name as recipe_owner_name', // tên người tạo công thức
+                'favorites.*',
+            )
+            ->get();
+
+        return response()->json([
+            'data' => $favorite,
+            'status' => 200,
+            'message' => 'Lấy dữ liệu thành công',
+        ]);
+    } else {
+        return response()->json([
+            'status' => 401,
+            'message' => 'Không xác thực',
+        ]);
+    }
+}
+
+
+    // thêm vào công thức yêu thích
+    public function createData(Request $request)
     {
-        //
+        $user = Auth::guard('sanctum')->user();
+
+        $exists = Favorite::where('user_id', $user->id)
+            ->where('recipe_id', $request->recipe_id)
+            ->first();
+
+        if ($exists) {
+            return response()->json(['message' => 'Đã có trong danh sách yêu thích'], 200);
+        }
+
+        Favorite::create([
+            'user_id' => $user->id,
+            'recipe_id' => $request->recipe_id,
+        ]);
+        return response()->json(['message' => 'Đã thêm vào danh sách yêu thích thành công']);
     }
 
-    /**
-     * Show the form for creating a new resource.
-     */
-    public function create()
+    public function DeleteData(Request $request)
     {
-        //
+        $user = Auth::guard('sanctum')->user();
+        if ($user) {
+            Favorite::where('user_id', $user->id)
+                ->where('recipe_id', $request->recipe_id)
+                ->delete();
+            return response()->json([
+                'status' => 200,
+                'message' => 'xóa dữ liệu thành công',
+            ]);
+        } else {
+            return response()->json([
+                'status' => 401,
+                'message' => 'xóa không thành công',
+            ]);
+        }
     }
 
-    /**
-     * Store a newly created resource in storage.
-     */
-    public function store(Request $request)
-    {
-        //
-    }
-
-    /**
-     * Display the specified resource.
-     */
-    public function show(Favorite $favorite)
-    {
-        //
-    }
-
-    /**
-     * Show the form for editing the specified resource.
-     */
-    public function edit(Favorite $favorite)
-    {
-        //
-    }
-
-    /**
-     * Update the specified resource in storage.
-     */
-    public function update(Request $request, Favorite $favorite)
-    {
-        //
-    }
-
-    /**
-     * Remove the specified resource from storage.
-     */
-    public function destroy(Favorite $favorite)
-    {
-        //
-    }
+    
 }

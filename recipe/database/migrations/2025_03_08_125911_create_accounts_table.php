@@ -16,8 +16,8 @@ return new class extends Migration
             $table->string('user_name');
             $table->string('password');
             $table->string('email');
-            $table->string('avatar');
-            $table->integer('id_roles');
+            $table->string('avatar')->default('https://i.pinimg.com/564x/24/21/85/242185eaef43192fc3f9646932fe3b46.jpg');
+            $table->integer('id_roles')->default(2);
             $table->timestamps();
         });
     }

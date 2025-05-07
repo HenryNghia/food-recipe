@@ -12,8 +12,8 @@ return new class extends Migration
     public function up(): void
     {
         Schema::create('favorites', function (Blueprint $table) {
-            $table->Integer('user_id')->unique();
-            $table->Integer('recipe_id')->unique();
+            $table->Integer('user_id');
+            $table->Integer('recipe_id');
             $table->dateTime('saved_date');
             $table->timestamps();
             $table->primary(['user_id', 'recipe_id']); // Tạo khóa chính từ user_id và recipe_id
