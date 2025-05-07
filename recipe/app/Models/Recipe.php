@@ -21,5 +21,6 @@ class Recipe extends Model
         'id_category',
         'id_level',
         'timecook',
+        'rating'
     ];
 }
