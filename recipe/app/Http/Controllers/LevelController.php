@@ -7,59 +7,117 @@ use Illuminate\Http\Request;
 
 class LevelController extends Controller
 {
-    /**
-     * Display a listing of the resource.
-     */
-    public function index()
+    public function GetData()
     {
-        //
+        // lấy ra danh mục
+        $data = Level::get();
+        if ($data) {
+            return response()->json(
+                [
+                    'status' => 200,
+                    'data' => $data,
+                    'message' => 'success'
+                ]
+            );
+        }
+        return response()->json(
+            [
+                'status' => 404,
+                'message' => 'Không tìm thấy dữ liệu'
+            ],
+            404
+        );
     }
 
-    /**
-     * Show the form for creating a new resource.
-     */
-    public function create()
+    public function SearchData(Request $request)
     {
-        //
+        $key = "%" . $request->abc . "%";
+
+        $data = Level::select('id', 'name_level', 'image')
+            ->where('name_level', 'like', $key)
+            ->get();
+        if ($data) {
+            return response()->json(
+                [
+                    'status' => 200,
+                    'data' => $data,
+                    'message' => 'search success'
+                ]
+            );
+        }
+        return response()->json(
+            [
+                'status' => 404,
+                'message' => 'not found data'
+            ],
+            404
+        );
+    }
+    public function CreateData(Request $request)
+    {
+        $data = new Level();
+        $data->name_level = $request->name_level;
+        $data->image = $request->image;
+        if ($data->save()) {
+            return response()->json(
+                [
+                    'status' => 200,
+                    'message' => 'create success'
+                ]
+            );
+        }
+        return response()->json(
+            [
+                'status' => 404,
+                'message' => 'create fail'
+            ],
+            404
+        );
+    }
+    
+    public function UpdateData(Request $request)
+    {
+        $data = Level::find($request->id);
+        if ($data) {
+            $data->name_level = $request->name_level;
+            $data->image = $request->image;
+            if ($data->save()) {
+                return response()->json(
+                    [
+                        'status' => 200,
+                        'message' => 'update success'
+                    ]
+                );
+            }
+        }
+        return response()->json(
+            [
+                'status' => 404,
+                'message' => 'update fail'
+            ],
+            404
+        );
     }
 
-    /**
-     * Store a newly created resource in storage.
-     */
-    public function store(Request $request)
+    public function DeleteData(Request $request)
     {
-        //
-    }
-
-    /**
-     * Display the specified resource.
-     */
-    public function show(Level $level)
-    {
-        //
-    }
-
-    /**
-     * Show the form for editing the specified resource.
-     */
-    public function edit(Level $level)
-    {
-        //
-    }
-
-    /**
-     * Update the specified resource in storage.
-     */
-    public function update(Request $request, Level $level)
-    {
-        //
-    }
-
-    /**
-     * Remove the specified resource from storage.
-     */
-    public function destroy(Level $level)
-    {
-        //
+        $data = Level::find($request->id);
+        if ($data) {
+            if ($data->delete()) {
+                return response()->json(
+                    [
+                        'status' => 200,
+                        'message' => 'delete success'
+                    ]
+                );
+            }
+        }
+        return response()->json(
+            [
+                'status' => 404,
+                'message' => 'delete fail'
+            ],
+            404
+        );
     }
 }
