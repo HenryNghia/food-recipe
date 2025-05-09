@@ -23,7 +23,10 @@ class RecipeController extends Controller
                 'categories.name_category',
                 'levels.name_level',
                 'recipes.*',
-            )->get();
+            )
+            ->orderBy('recipes.rating', 'desc') // Sắp xếp theo rating giảm dần (cao nhất trước)
+            ->orderBy('recipes.created_at', 'desc')
+            ->get();
         $data = $data->map(function ($item) {
             $item->description = $item->description ? explode('\\', $item->description) : [];
             $item->instructions = $item->instructions ? explode('\\', $item->instructions) : [];
@@ -48,6 +51,83 @@ class RecipeController extends Controller
         );
     }
 
+    public function GetDataByRating()
+    {
+        $data = Recipe::join('users', 'users.id', 'recipes.user_id')
+            ->join('categories', 'categories.id', 'recipes.id_category')
+            ->join('levels', 'levels.id', 'recipes.id_level')
+            ->where('recipes.rating', '>', 4)
+            ->select(
+                'users.name',
+                'users.avatar',
+                'categories.name_category',
+                'levels.name_level',
+                'recipes.*',
+            )
+            ->orderBy('recipes.rating', 'desc') // Sắp xếp theo rating giảm dần (cao nhất trước)
+            ->orderBy('recipes.created_at', 'desc') // *** Thêm sắp xếp theo thời gian tạo giảm dần (mới nhất trước) ***
+            ->get();
+        $data = $data->map(function ($item) {
+            $item->description = $item->description ? explode('\\', $item->description) : [];
+            $item->instructions = $item->instructions ? explode('\\', $item->instructions) : [];
+            $item->ingredients = $item->ingredients ? explode(',', $item->ingredients) : [];
+            return $item;
+        });
+        if ($data) {
+            return response()->json(
+                [
+                    'status' => 200,
+                    'data' => $data,
+                    'message' => 'success'
+                ]
+            );
+        }
+        return response()->json(
+            [
+                'status' => 404,
+                'message' => 'Không tìm thấy dữ liệu'
+            ],
+            404
+        );
+    }
+
+    public function GetDataByTime()
+    {
+        $data = Recipe::join('users', 'users.id', 'recipes.user_id')
+            ->join('categories', 'categories.id', 'recipes.id_category')
+            ->join('levels', 'levels.id', 'recipes.id_level')
+            ->select(
+                'users.name',
+                'users.avatar',
+                'categories.name_category',
+                'levels.name_level',
+                'recipes.*',
+            )
+            ->orderBy('recipes.created_at', 'desc') // *** Thêm sắp xếp theo thời gian tạo giảm dần (mới nhất trước) ***
+            ->get();
+        $data = $data->map(function ($item) {
+            $item->description = $item->description ? explode('\\', $item->description) : [];
+            $item->instructions = $item->instructions ? explode('\\', $item->instructions) : [];
+            $item->ingredients = $item->ingredients ? explode(',', $item->ingredients) : [];
+            return $item;
+        });
+        if ($data) {
+            return response()->json(
+                [
+                    'status' => 200,
+                    'data' => $data,
+                    'message' => 'success'
+                ]
+            );
+        }
+        return response()->json(
+            [
+                'status' => 404,
+                'message' => 'Không tìm thấy dữ liệu'
+            ],
+            404
+        );
+    }
     public function GetDataById($id)
     {
         $data = Recipe::where('recipes.id', '=', $id) // *** QUAN TRỌNG: Lọc theo ID của công thức ***
@@ -118,7 +198,8 @@ class RecipeController extends Controller
             [
                 'status' => 404,
                 'message' => 'Công thưc không tồn tại'
-            ]);
+            ]
+        );
     }
 
     // tìm kiếm tất cả công thức
@@ -163,23 +244,32 @@ class RecipeController extends Controller
     }
     public function CreateData(Request $request)
     {
-        try {
-            Recipe::create([
-                'image' => $request->image,
-                'user_id' => $request->user_id,
-                'title' => $request->title,
-                'description' => $request->description,
-                'ingredients' => $request->ingredients,
-                'instructions' => $request->instructions,
-                'image' => $request->image,
-                'id_category' => $request->id_category,
-                'id_level' => $request->id_level,
-                'timecook' => $request->time_cook,
-            ]);
 
+        try {
+            $user = Auth::guard('sanctum')->user();
+            if ($user) {
+                Recipe::create([
+                    'user_id' => $user->id,
+                    'image' => $request->image,
+                    'title' => $request->title,
+                    'description' => $request->description,
+                    'ingredients' => $request->ingredients,
+                    'instructions' => $request->instructions,
+                    'rating' => 0,
+                    'id_category' => $request->id_category,
+                    'id_level' => $request->id_level,
+                    'timecook' => $request->time_cook,
+                    'created_at' => now(),
+                ]);
+
+                return response()->json([
+                    'status'            =>   200,
+                    'message'           =>   'tạo công thức thành công!',
+                ]);
+            }
             return response()->json([
-                'status'            =>   200,
-                'message'           =>   'create data success!',
+                'status'            =>   404,
+                'message'           =>   'tạo công thức thất bại!',
             ]);
         } catch (Exception $e) {
             Log::info("error", $e);

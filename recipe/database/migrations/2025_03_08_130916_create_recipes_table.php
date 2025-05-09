@@ -22,7 +22,7 @@ return new class extends Migration
             $table->integer('id_category');
             $table->integer('id_level');
             $table->string('timecook');
-            $table->float('rating');
+            $table->float('rating')->default(0);
             $table->timestamps();
         });
     }

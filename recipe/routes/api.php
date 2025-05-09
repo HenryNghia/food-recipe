@@ -3,6 +3,7 @@
 use App\Http\Controllers\AccountController;
 use App\Http\Controllers\CategoryController;
 use App\Http\Controllers\FavoriteController;
+use App\Http\Controllers\LevelController;
 use App\Http\Controllers\RecipeController;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
@@ -36,6 +37,8 @@ Route::group([], function() {
 
     Route::group(['prefix' => '/recipe'], function() {
         Route::get('/data', [RecipeController::class, 'GetData']);
+        Route::get('/data-by-rating', [RecipeController::class, 'GetDataByRating']);
+        Route::get('/data-by-time', [RecipeController::class, 'GetDataByTime']);
         Route::get('/data/{id}', [RecipeController::class, 'GetDataById']);
         Route::get('/data-by-category/{categoryId}', [RecipeController::class, 'GetDataByCategory']);
         Route::get('/suggestions', [RecipeController::class, 'getSearchSuggestions']);
@@ -58,6 +61,14 @@ Route::group([], function() {
     Route::group(['prefix' => '/user'], function() {
         Route::get('/data', [AccountController::class, 'GetData']);
         Route::put('/update-data-name', [AccountController::class, 'UpdateData']);
+    });
+
+    Route::group(['prefix' => '/level'], function() {
+        Route::get('/data', [LevelController::class, 'GetData']);
+        Route::post('/search-data', [LevelController::class, 'SearchData']);
+        Route::post('/create-data', [LevelController::class, 'CreateData']);
+        Route::put('/update-data', [LevelController::class, 'UpdateData']);
+        Route::post('/delete-data', [LevelController::class, 'DeleteData']);
     });
 });
 
