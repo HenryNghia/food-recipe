@@ -9,54 +9,62 @@ use Illuminate\Support\Facades\Auth;
 class FavoriteController extends Controller
 {
     public function GetDataByUser()
-{
-    $user = Auth::guard('sanctum')->user();
-    if ($user) {
-        $favorite = Favorite::where('favorites.user_id', $user->id)
-            ->join('recipes', 'recipes.id', '=', 'favorites.recipe_id')
-            ->join('users as recipe_owner', 'recipe_owner.id', '=', 'recipes.user_id') // alias ở đây
-            ->select(
-                'recipes.id',
-                'recipes.title',
-                'recipes.rating',
-                'recipes.image',
-                'recipe_owner.name as recipe_owner_name', // tên người tạo công thức
-                'favorites.*',
-            )
-            ->get();
+    {
+        $user = Auth::guard('sanctum')->user();
+        if ($user) {
+            $favorite = Favorite::where('favorites.user_id', $user->id)
+                ->join('recipes', 'recipes.id', '=', 'favorites.recipe_id')
+                ->join('users as recipe_owner', 'recipe_owner.id', '=', 'recipes.user_id') // alias ở đây
+                ->select(
+                    'recipes.id',
+                    'recipes.title',
+                    'recipes.rating',
+                    'recipes.image',
+                    'recipe_owner.name as recipe_owner_name', // tên người tạo công thức
+                    'favorites.*',
+                )
+                ->orderBy('favorites.saved_date', 'desc')
+                ->get();
 
-        return response()->json([
-            'data' => $favorite,
-            'status' => 200,
-            'message' => 'Lấy dữ liệu thành công',
-        ]);
-    } else {
-        return response()->json([
-            'status' => 401,
-            'message' => 'Không xác thực',
-        ]);
+            return response()->json([
+                'data' => $favorite,
+                'status' => 200,
+                'message' => 'Lấy dữ liệu thành công',
+            ]);
+        } else {
+            return response()->json([
+                'status' => 401,
+                'message' => 'Không xác thực',
+            ]);
+        }
     }
-}
 
 
     // thêm vào công thức yêu thích
     public function createData(Request $request)
     {
         $user = Auth::guard('sanctum')->user();
+        if ($user) {
+            $exists = Favorite::where('user_id', $user->id)
+                ->where('recipe_id', $request->recipe_id)
+                ->first();
 
-        $exists = Favorite::where('user_id', $user->id)
-            ->where('recipe_id', $request->recipe_id)
-            ->first();
+            if ($exists) {
+                return response()->json([
+                      'status' => 201,
+                      'message' => 'Đã có trong danh sách yêu thích'], 200);
+            }
 
-        if ($exists) {
-            return response()->json(['message' => 'Đã có trong danh sách yêu thích'], 200);
+            Favorite::create([
+                'user_id' => $user->id,
+                'recipe_id' => $request->recipe_id,
+                'saved_date' => now(),
+            ]);
+            return response()->json([
+                'status' => 200,
+                'message' => 'Đã thêm vào danh sách yêu thích thành công',
+            ]);
         }
-
-        Favorite::create([
-            'user_id' => $user->id,
-            'recipe_id' => $request->recipe_id,
-        ]);
-        return response()->json(['message' => 'Đã thêm vào danh sách yêu thích thành công']);
     }
 
     public function DeleteData(Request $request)
@@ -78,5 +86,25 @@ class FavoriteController extends Controller
         }
     }
 
-    
+    public function CheckData(Request $request)
+    {
+        $user = Auth::guard('sanctum')->user();
+        if ($user) {
+            $exists = Favorite::where('user_id', $user->id)
+                ->where('recipe_id', $request->recipe_id)
+                ->first();
+
+            if ($exists) {
+                return response()->json([
+                    'status' => 200,
+                    'message' => 'Đã có trong danh sách yêu thích',
+                ]);
+            } else {
+                return response()->json([
+                    'status' => 201,
+                    'message' => 'Không có trong danh sách yêu thích',
+                ]);
+            }
+        }
+    }
 }

@@ -19,10 +19,11 @@ use Illuminate\Support\Facades\Route;
 |
 */
 Route::post('/login', [AccountController::class, 'login']);
+Route::post('/login-admin', [AccountController::class, 'loginAdmin']);
 Route::post('/register', [AccountController::class, 'register']);
 Route::post('/check', [AccountController::class, 'checkToken']);
 Route::get('/dang-xuat', [AccountController::class, 'logout']);
-Route::get('/dang-xuat-tat-ca', [AccountController::class, 'logoutAll']);
+Route::post('/dang-xuat-tat-ca', [AccountController::class, 'logoutAll']);
 Route::delete('/remove-token/{id}', [AccountController::class, 'removeToken']);
 
 Route::group([], function() {
@@ -41,7 +42,7 @@ Route::group([], function() {
         Route::get('/data-by-time', [RecipeController::class, 'GetDataByTime']);
         Route::get('/data/{id}', [RecipeController::class, 'GetDataById']);
         Route::get('/data-by-category/{categoryId}', [RecipeController::class, 'GetDataByCategory']);
-        Route::get('/suggestions', [RecipeController::class, 'getSearchSuggestions']);
+        Route::get('/data-by-user', [RecipeController::class, 'GetDataByUser']);
         Route::post('/search-data', [RecipeController::class, 'SearchData']);
         Route::post('/search-data-all', [RecipeController::class, 'SearchDataAll']);
         Route::post('/create-data', [RecipeController::class, 'CreateData']);
@@ -56,11 +57,12 @@ Route::group([], function() {
         Route::post('/create-data', [FavoriteController::class, 'CreateData']);
         Route::put('/update-data', [FavoriteController::class, 'UpdateData']);
         Route::post('/delete-data', [FavoriteController::class, 'DeleteData']);
+         Route::post('/check-data', [FavoriteController::class, 'CheckData']);
     });
 
     Route::group(['prefix' => '/user'], function() {
         Route::get('/data', [AccountController::class, 'GetData']);
-        Route::put('/update-data-name', [AccountController::class, 'UpdateData']);
+        Route::put('/update-data', [AccountController::class, 'UpdateData']);
     });
 
     Route::group(['prefix' => '/level'], function() {

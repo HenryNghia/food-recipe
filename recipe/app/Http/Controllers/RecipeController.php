@@ -258,7 +258,7 @@ class RecipeController extends Controller
                     'rating' => 0,
                     'id_category' => $request->id_category,
                     'id_level' => $request->id_level,
-                    'timecook' => $request->time_cook,
+                    'timecook' => $request->timecook,
                     'created_at' => now(),
                 ]);
 
@@ -283,30 +283,60 @@ class RecipeController extends Controller
     public function UpdateData(Request $request)
     {
         try {
-            Recipe::where('id', $request->id)
+            $user = Auth::guard('sanctum')->user();
+
+            if (!$user) {
+                return response()->json([
+                    'status' => 401,
+                    'message' => 'Người dùng chưa đăng nhập.',
+                ]);
+            }
+
+            $updated = Recipe::where('recipes.id', $request->id)
+                ->where('user_id', '=', $user->id)
                 ->update([
-                    'user_id' => $request->user_id,
+                    'user_id' => $user->id,
                     'title' => $request->title,
                     'description' => $request->description,
                     'ingredients' => $request->ingredients,
                     'instructions' => $request->instructions,
                     'image' => $request->image,
+                    'rating' => 0,
                     'id_category' => $request->id_category,
                     'id_level' => $request->id_level,
-                    'timecook' => $request->time_cook,
+                    'timecook' => $request->timecook,
+                    'updated_at' => now(), // ✅ dùng đúng updated_at
                 ]);
-        } catch (Exception $e) {
-            Log::info("error", $e);
+
+            if ($updated) {
+                return response()->json([
+                    'status' => 200,
+                    'message' => 'Cập nhật công thức thành công.',
+                ]);
+            } else {
+                return response()->json([
+                    'status' => 404,
+                    'message' => 'Không tìm thấy công thức để cập nhật.',
+                ]);
+            }
+        } catch (\Exception $e) {
+            Log::error('Lỗi khi cập nhật công thức', [
+                'message' => $e->getMessage(),
+                'line' => $e->getLine(),
+                'file' => $e->getFile(),
+            ]);
+
             return response()->json([
-                'status'            =>   404,
-                'message'           =>   'error',
+                'status' => 500,
+                'message' => 'Đã xảy ra lỗi khi cập nhật.',
             ]);
         }
     }
+
     public function deleteData(Request $request)
     {
         try {
-            Recipe::where('id', $request->id)
+            Recipe::where('recipes.id', $request->id)
                 ->delete();
             return response()->json([
                 'status'            =>   200,
@@ -360,38 +390,96 @@ class RecipeController extends Controller
             404
         );
     }
-    // lấy công thức theo cấp độ chọn
-    public function getSearchSuggestions(Request $request)
+
+    public function GetDataByUser()
     {
-        $keyword = $request->input('keyword', '');
-
-        if (empty($keyword)) {
-            return response()->json([
-                'status' => 200,
-                'data' => [],
-                'message' => 'Empty keyword'
-            ]);
-        }
-
         try {
-            $suggestions = Recipe::where('title', 'like', '%' . $keyword . '%')
-                ->select('title')
-                ->distinct()
-                ->limit(5) // Giới hạn 5 gợi ý
-                ->get()
-                ->pluck('title'); // Lấy ra mảng các title
-
-            return response()->json([
-                'status' => 200,
-                'data' => $suggestions,
-                'message' => 'Suggestions retrieved successfully'
-            ]);
-        } catch (Exception $e) {
-            Log::error("Error getting search suggestions: " . $e->getMessage());
-            return response()->json([
-                'status' => 500,
-                'message' => 'Error retrieving suggestions'
-            ], 500);
+            $user = Auth::guard('sanctum')->user();
+            if ($user) {
+                if ($user->id_roles === 2) {
+                    $data = Recipe::join('users', 'users.id', 'recipes.user_id')
+                        ->join('categories', 'categories.id', 'recipes.id_category')
+                        ->join('levels', 'levels.id', 'recipes.id_level')
+                        ->where('recipes.user_id', $user->id)
+                        ->select(
+                            'users.name',
+                            'users.avatar',
+                            'categories.name_category',
+                            'levels.name_level',
+                            'recipes.*',
+                        )
+                        ->orderBy('recipes.created_at', 'desc')
+                        ->get();
+                    $data = $data->map(function ($item) {
+                        $item->description = $item->description ? explode('\\', $item->description) : [];
+                        $item->instructions = $item->instructions ? explode('\\', $item->instructions) : [];
+                        $item->ingredients = $item->ingredients ? explode(',', $item->ingredients) : [];
+                        return $item;
+                    });
+                    if ($data) {
+                        return response()->json(
+                            [
+                                'status' => 200,
+                                'data' => $data,
+                                'message' => 'success'
+                            ]
+                        );
+                    }
+                    return response()->json(
+                        [
+                            'status' => 404,
+                            'message' => 'Không tìm thấy dữ liệu'
+                        ],
+                        404
+                    );
+                } else {
+                    return response()->json(
+                        [
+                            'status' => 404,
+                            'message' => 'Không có quyền truy cập',
+                            'data' => $user,
+                        ],
+                        404
+                    );
+                }
+            }
+        } catch (\Throwable $th) {
+            //throw $th;
         }
     }
+
+    // lấy công thức theo cấp độ chọn
+    // public function getSearchSuggestions(Request $request)
+    // {
+    //     $keyword = $request->input('keyword', '');
+
+    //     if (empty($keyword)) {
+    //         return response()->json([
+    //             'status' => 200,
+    //             'data' => [],
+    //             'message' => 'Empty keyword'
+    //         ]);
+    //     }
+
+    //     try {
+    //         $suggestions = Recipe::where('title', 'like', '%' . $keyword . '%')
+    //             ->select('title')
+    //             ->distinct()
+    //             ->limit(5) // Giới hạn 5 gợi ý
+    //             ->get()
+    //             ->pluck('title'); // Lấy ra mảng các title
+
+    //         return response()->json([
+    //             'status' => 200,
+    //             'data' => $suggestions,
+    //             'message' => 'Suggestions retrieved successfully'
+    //         ]);
+    //     } catch (Exception $e) {
+    //         Log::error("Error getting search suggestions: " . $e->getMessage());
+    //         return response()->json([
+    //             'status' => 500,
+    //             'message' => 'Error retrieving suggestions'
+    //         ], 500);
+    //     }
+    // }
 }
