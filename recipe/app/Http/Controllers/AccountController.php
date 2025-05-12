@@ -46,6 +46,41 @@ class AccountController extends Controller
         }
     }
 
+    public function loginAdmin(Request $request)
+    {
+        $credentials = $request->only('email', 'password');
+        if (Auth::guard('web')->attempt($credentials)) {
+            $user = Auth::guard('web')->user();
+            if ($user->id_roles == 1) {
+                $token = $user->createToken('api-token-nghia')->plainTextToken;
+                return response()->json(
+                    [
+                        'message' => 'Login Success',
+                        'user' => $user,
+                        'token' => $token
+                    ],
+                    200
+                );
+            } else {
+                Auth::guard('api')->logout(); // Đăng xuất nếu không phải role 2
+                return response()->json(
+                    [
+                        'message' => 'Đăng nhập không thành công.'
+                    ],
+                    403 // Forbidden
+                );
+            }
+        } else {
+            return response()->json(
+                [
+                    'message' => 'Login Failed'
+                ],
+                401
+            );
+        }
+    }
+
+
     public function register(Request $request)
     {
         $user = User::where('email', $request->email)->first();
@@ -159,16 +194,38 @@ class AccountController extends Controller
 
     public function updateData(Request $request)
     {
+        // Get the currently authenticated user using the 'sanctum' guard
         $user = Auth::guard('sanctum')->user();
+
+        // Check if a user is authenticated
         if ($user) {
-            $data = User::updated([
-                'name' => $request->name,
-                'avatar' => $request->avatar,
-            ]);
+            // Check if 'name' is present in the request and update if it is
+            if ($request->has('name')) {
+                $user->name = $request->name;
+            }
+
+            // Check if 'avatar' is present in the request and update if it is
+            if ($request->has('avatar')) {
+                // You might want to add validation and proper file handling here
+                // For simplicity, this example just updates the string value
+                $user->avatar = $request->avatar;
+            }
+
+            // Save the changes to the database
+            $user->save();
+
+            // Return a success response
             return response()->json([
                 'status' => 200,
-                'message' => 'Đã cập nhật thành công' . $request->name,
+                'message' => 'Profile updated successfully.',
+                'user' => $user, // Optionally return the updated user data
             ]);
+        } else {
+            // Return an error response if no user is authenticated
+            return response()->json([
+                'status' => 401, // Unauthorized status code
+                'message' => 'Unauthenticated.',
+            ], 401);
         }
     }
 }

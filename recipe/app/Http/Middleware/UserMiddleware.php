@@ -17,10 +17,9 @@ class UserMiddleware
     public function handle(Request $request, Closure $next): Response
     {
         $check  = Auth::guard('sanctum')->check();
-        if($check && Auth::user()->id_roles == 2){
+        if($check && Auth::user()){
             return $next($request);
         }
-
         return response()->json(
             [
                 'status'    =>  0,
