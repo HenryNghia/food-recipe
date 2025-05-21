@@ -1,5 +1,8 @@
 <?php
 
+use App\Http\Controllers\CategoryController;
+use App\Http\Controllers\TestController;
+use App\Models\Category;
 use Illuminate\Support\Facades\Route;
 
 /*
@@ -13,6 +16,4 @@ use Illuminate\Support\Facades\Route;
 |
 */
 
-Route::get('/', function () {
-    return view('welcome');
-});
+Route::get('/', [TestController::class, 'index']);

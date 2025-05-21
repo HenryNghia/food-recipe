@@ -7,8 +7,12 @@ use App\Models\Recipe;
 use Exception;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Http; // Hoặc dùng Guzzle trực tiếp
 use Illuminate\Support\Facades\Log;
 use Psy\Readline\Hoa\Console;
+use GuzzleHttp\Client; // Thêm dòng này nếu dùng Guzzle trực tiếp
+use GuzzleHttp\Exception\RequestException; // Thêm để bắt lỗi Guzzle
+use Illuminate\Support\Facades\Validator;
 
 class RecipeController extends Controller
 {
@@ -242,94 +246,164 @@ class RecipeController extends Controller
             'message' => 'Cong thức không tồn tại'
         ]);
     }
+
     public function CreateData(Request $request)
     {
+        // Kiểm tra xác thực thủ công (nếu không dùng middleware 'auth:sanctum' trên route)
+        $user = Auth::guard('sanctum')->user();
+        if (!$user) {
+            return response()->json([
+                'status' => false,
+                'message' => 'Yêu cầu xác thực. Vui lòng đăng nhập.',
+            ], 401);
+        }
 
         try {
-            $user = Auth::guard('sanctum')->user();
-            if ($user) {
-                Recipe::create([
-                    'user_id' => $user->id,
-                    'image' => $request->image,
-                    'title' => $request->title,
-                    'description' => $request->description,
-                    'ingredients' => $request->ingredients,
-                    'instructions' => $request->instructions,
-                    'rating' => 0,
-                    'id_category' => $request->id_category,
-                    'id_level' => $request->id_level,
-                    'timecook' => $request->timecook,
-                    'created_at' => now(),
-                ]);
+            // === Bước 1: Validation dữ liệu từ Request ===
+            $validator = Validator::make($request->all(), [
+                'title' => ['required', 'string', 'max:255'],
+                'description' => ['required', 'string'],
+                'image' => ['required', 'image', 'mimes:jpeg,png,jpg,gif,svg', 'max:2048'],
+                'ingredients' => ['required', 'string'],
+                'instructions' => ['required', 'string'],
+                'id_category' => ['required', 'integer', 'exists:categories,id'],
+                'id_level' => ['required', 'integer', 'exists:levels,id'],
+                'timecook' => ['required', 'string'],
+            ]);
 
+            if ($validator->fails()) {
                 return response()->json([
-                    'status'            =>   200,
-                    'message'           =>   'tạo công thức thành công!',
-                ]);
+                    'status' => false,
+                    'message' => 'Dữ liệu gửi lên không hợp lệ.',
+                    'errors' => $validator->errors(),
+                ], 422);
             }
-            return response()->json([
-                'status'            =>   404,
-                'message'           =>   'tạo công thức thất bại!',
+
+            // === Bước 2: Xử lý Upload File ảnh ===
+            $imageUrl = null;
+            if ($request->hasFile('image')) { // Kiểm tra file có được gửi lên không.
+                $imageFile = $request->file('image'); // Lấy đối tượng UploadedFile.
+                $originalName = pathinfo($imageFile->getClientOriginalName(), PATHINFO_FILENAME);
+                $extension = $imageFile->getClientOriginalExtension();
+                $imageName = $originalName . '_' . time() . '.' . $extension;
+                // Lưu file vào disk 'public' (thường là storage/app/public), trong thư mục 'recipes'.
+                $imagePath = $imageFile->storeAs('user/recipes', $imageName, 'public');
+                $imageUrl = asset('storage/' . $imagePath);
+            }
+
+            // === Bước 3: Tạo bản ghi Recipe trong Database ===
+            $recipe = Recipe::create([
+                'user_id' => $user->id,
+                'image' => $imageUrl,
+                'title' => $request->input('title'),
+                'description' => $request->input('description'),
+                'ingredients' => $request->input('ingredients'),
+                'instructions' => $request->input('instructions'),
+                'rating' => 0,
+                'id_category' => $request->input('id_category'),
+                'id_level' => $request->input('id_level'),
+                'timecook' => $request->input('timecook'),
             ]);
+
+            // === Bước 4: Trả về Response thành công ===
+            return response()->json([
+                'status' => true,
+                'message' => 'Tạo công thức thành công!',
+                'recipe' => $recipe,
+            ], 201);
         } catch (Exception $e) {
-            Log::info("error", $e);
-            return response()->json([
-                'status'            =>   404,
-                'message'           =>   'error',
+            // === Bước 5: Xử lý các Exception không mong muốn ===
+            Log::error("Lỗi khi tạo công thức: " . $e->getMessage(), [
+                'exception_details' => $e->getTraceAsString(), // Cung cấp thêm chi tiết cho việc debug
+                'request_data' => $request->except(['image']), // Loại bỏ dữ liệu file lớn khỏi log nếu cần
+                'user_id' => $user->id ?? null
             ]);
+            return response()->json([
+                'status' => false,
+                'message' => 'Đã xảy ra lỗi server khi tạo công thức. Vui lòng thử lại sau.',
+            ], 500);
+
         }
     }
 
     public function UpdateData(Request $request)
     {
-        try {
-            $user = Auth::guard('sanctum')->user();
-
-            if (!$user) {
-                return response()->json([
-                    'status' => 401,
-                    'message' => 'Người dùng chưa đăng nhập.',
-                ]);
-            }
-
-            $updated = Recipe::where('recipes.id', $request->id)
-                ->where('user_id', '=', $user->id)
-                ->update([
-                    'user_id' => $user->id,
-                    'title' => $request->title,
-                    'description' => $request->description,
-                    'ingredients' => $request->ingredients,
-                    'instructions' => $request->instructions,
-                    'image' => $request->image,
-                    'rating' => 0,
-                    'id_category' => $request->id_category,
-                    'id_level' => $request->id_level,
-                    'timecook' => $request->timecook,
-                    'updated_at' => now(), // ✅ dùng đúng updated_at
-                ]);
-
-            if ($updated) {
-                return response()->json([
-                    'status' => 200,
-                    'message' => 'Cập nhật công thức thành công.',
-                ]);
-            } else {
-                return response()->json([
-                    'status' => 404,
-                    'message' => 'Không tìm thấy công thức để cập nhật.',
-                ]);
-            }
-        } catch (\Exception $e) {
-            Log::error('Lỗi khi cập nhật công thức', [
-                'message' => $e->getMessage(),
-                'line' => $e->getLine(),
-                'file' => $e->getFile(),
-            ]);
-
+        // Kiểm tra xác thực thủ công (nếu không dùng middleware 'auth:sanctum' trên route)
+        $user = Auth::guard('sanctum')->user();
+        if (!$user) {
             return response()->json([
-                'status' => 500,
-                'message' => 'Đã xảy ra lỗi khi cập nhật.',
+                'status' => false,
+                'message' => 'Yêu cầu xác thực. Vui lòng đăng nhập.',
+            ], 401); // 401 Unauthorized là mã chuẩn
+        }
+
+        try {
+            // === Bước 1: Validation dữ liệu từ Request ===
+            $validator = Validator::make($request->all(), [
+                'title' => ['sometimes', 'string', 'max:255'],
+                'description' => ['sometimes', 'string'],
+                'image' => ['sometimes', 'image', 'mimes:jpeg,png,jpg,gif,svg', 'max:2048'],
+                'ingredients' => ['sometimes', 'string'],
+                'instructions' => ['sometimes', 'string'],
+                'id_category' => ['sometimes', 'integer', 'exists:categories,id'],
+                'id_level' => ['sometimes', 'integer', 'exists:levels,id'],
+                'timecook' => ['sometimes', 'string'],
             ]);
+
+            if ($validator->fails()) {
+                return response()->json([
+                    'status' => false,
+                    'message' => 'Dữ liệu gửi lên không hợp lệ.',
+                    'errors' => $validator->errors(),
+                ], 422);
+            }
+
+            $recipe = Recipe::find($request->id);
+            if (!$recipe) {
+                return response()->json([
+                    'status' => false,
+                    'message' => 'Không tìm thấy công thức để cập nhật.',
+                ], 404);
+            }
+
+            // === Bước 2: Xử lý Upload File ảnh ===
+            $imageUrl = $recipe->image;
+            if ($request->hasFile('image')) {
+                $imageFile = $request->file('image');
+                $originalName = pathinfo($imageFile->getClientOriginalName(), PATHINFO_FILENAME);
+                $extension = $imageFile->getClientOriginalExtension();
+                $imageName = $originalName . '_' . time() . '.' . $extension;
+                // Lưu file vào disk 'public' (thường là storage/app/public), trong thư mục 'recipes'.
+                $imagePath = $imageFile->storeAs('user/avatars', $imageName, 'public');
+                $imageUrl = asset('storage/' . $imagePath);
+            }
+            // === Bước 3: Cập nhật bản ghi Recipe trong Database ===
+            $recipe->update([
+                'user_id' => $user->id,
+                'image' => $imageUrl,
+                'title' => $request->input('title'),
+                'description' => $request->input('description'),
+                'ingredients' => $request->input('ingredients'),
+                'instructions' => $request->input('instructions'),
+                'rating' => 0,
+                'id_category' => $request->input('id_category'),
+                'id_level' => $request->input('id_level'),
+                'timecook' => $request->input('timecook'),
+            ]);
+
+            // === Bước 4: Trả về Response thành công ===
+            return response()->json([
+                'status' => true,
+                'message' => 'Cập nhật thành công!',
+                'recipe' => $recipe,
+            ], 201);
+        } catch (Exception $e) {
+            // === Bước 5: Xử lý các Exception không mong muốn ===
+            Log::error("Lỗi khi tạo công thức: " . $e->getMessage(), ['exception' => $e, 'request_data' => $request->all(), 'user_id' => $user->id ?? null]);
+            return response()->json([
+                'status' => false,
+                'message' => 'Đã xảy ra lỗi server khi cập nhật công thức. Vui lòng thử lại sau.',
+            ], 500);
         }
     }
 
@@ -447,39 +521,4 @@ class RecipeController extends Controller
             //throw $th;
         }
     }
-
-    // lấy công thức theo cấp độ chọn
-    // public function getSearchSuggestions(Request $request)
-    // {
-    //     $keyword = $request->input('keyword', '');
-
-    //     if (empty($keyword)) {
-    //         return response()->json([
-    //             'status' => 200,
-    //             'data' => [],
-    //             'message' => 'Empty keyword'
-    //         ]);
-    //     }
-
-    //     try {
-    //         $suggestions = Recipe::where('title', 'like', '%' . $keyword . '%')
-    //             ->select('title')
-    //             ->distinct()
-    //             ->limit(5) // Giới hạn 5 gợi ý
-    //             ->get()
-    //             ->pluck('title'); // Lấy ra mảng các title
-
-    //         return response()->json([
-    //             'status' => 200,
-    //             'data' => $suggestions,
-    //             'message' => 'Suggestions retrieved successfully'
-    //         ]);
-    //     } catch (Exception $e) {
-    //         Log::error("Error getting search suggestions: " . $e->getMessage());
-    //         return response()->json([
-    //             'status' => 500,
-    //             'message' => 'Error retrieving suggestions'
-    //         ], 500);
-    //     }
-    // }
 }

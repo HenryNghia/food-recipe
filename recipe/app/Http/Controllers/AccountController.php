@@ -3,9 +3,13 @@
 namespace App\Http\Controllers;
 
 use App\Models\User;
+use Exception;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Facades\Validator;
 use Jenssegers\Agent\Agent;
 
 class AccountController extends Controller
@@ -57,7 +61,8 @@ class AccountController extends Controller
                     [
                         'message' => 'Login Success',
                         'user' => $user,
-                        'token' => $token
+                        'token' => $token,
+                        'status' => 200
                     ],
                     200
                 );
@@ -65,7 +70,8 @@ class AccountController extends Controller
                 Auth::guard('api')->logout(); // Đăng xuất nếu không phải role 2
                 return response()->json(
                     [
-                        'message' => 'Đăng nhập không thành công.'
+                        'message' => 'Đăng nhập không thành công.',
+                        'status' => 403
                     ],
                     403 // Forbidden
                 );
@@ -111,12 +117,12 @@ class AccountController extends Controller
                 ->delete();
             return response()->json([
                 'message'  => 'Đã đăng xuất thành công!',
-                'status'   => true,
+                'status'   => 200,
             ]);
         } else {
             return response()->json([
                 'message'  => 'Bạn cần đăng nhập hệ thống',
-                'status'   => false,
+                'status'   => 404,
             ]);
         }
     }
@@ -158,18 +164,21 @@ class AccountController extends Controller
 
             if ($tokenExists) {
                 return response()->json([
-                    'status'  => true,
+                    'status'  => 200,
                     'message' => 'Bạn đang đăng nhập hệ thống',
+                    'email'     =>  $user->email,
+                    'name'    =>  $user->name,
+                    'list'      =>  $user->tokens,
                 ], 200);
             } else {
                 return response()->json([
-                    'status'  => false,
+                    'status'  => 404,
                     'message' => 'Token không hợp lệ',
                 ], 401);
             }
         } else {
             return response()->json([
-                'status'  => false,
+                'status'  => 401,
                 'message' => 'Bạn cần đăng nhập hệ thống',
             ], 401);
         }
@@ -194,38 +203,69 @@ class AccountController extends Controller
 
     public function updateData(Request $request)
     {
-        // Get the currently authenticated user using the 'sanctum' guard
         $user = Auth::guard('sanctum')->user();
-
-        // Check if a user is authenticated
-        if ($user) {
-            // Check if 'name' is present in the request and update if it is
-            if ($request->has('name')) {
-                $user->name = $request->name;
-            }
-
-            // Check if 'avatar' is present in the request and update if it is
-            if ($request->has('avatar')) {
-                // You might want to add validation and proper file handling here
-                // For simplicity, this example just updates the string value
-                $user->avatar = $request->avatar;
-            }
-
-            // Save the changes to the database
-            $user->save();
-
-            // Return a success response
+        if (!$user) {
             return response()->json([
-                'status' => 200,
-                'message' => 'Profile updated successfully.',
-                'user' => $user, // Optionally return the updated user data
+                'status' => 404,
+                'message' => 'chưa đăng nhập!',
             ]);
-        } else {
-            // Return an error response if no user is authenticated
+        }
+
+        try {
+            // === Bước 1: Validation dữ liệu từ Request ===
+            $validator = Validator::make($request->all(), [
+                'name' => ['sometimes', 'string', 'max:255'],
+                'avatar' => ['sometimes', 'image', 'mimes:jpeg,png,jpg,gif,svg', 'max:2048'],
+            ]);
+
+            // Nếu validation thất bại
+            if ($validator->fails()) {
+                return response()->json([
+                    'status' => false,
+                    'message' => 'Dữ liệu gửi lên không hợp lệ.',
+                    'errors' => $validator->errors(),
+                ], 422);
+            }
+
+            $data = $user;
+            if (!$data) {
+                return response()->json([
+                    'status' => false,
+                    'message' => 'Không tìm thấy người dùng để cập nhật.',
+                ], 404);
+            }
+
+            $imageUrl = $user->avatar;
+            if ($request->hasFile('avatar')) {
+                $imageFile = $request->file('avatar');
+                $originalName = pathinfo($imageFile->getClientOriginalName(), PATHINFO_FILENAME);
+                $extension = $imageFile->getClientOriginalExtension();
+                $imageName = $originalName . '_' . time() . '.' . $extension;
+                $imagePath = $imageFile->storeAs('user/avatars', $imageName, 'public');
+                $imageUrl = asset('storage/' . $imagePath);
+            }
+
+            // === Bước 3: Cập nhật bản ghi Recipe trong Database ===
+            $data->update([
+                'avatar' => $imageUrl,
+                'name' => $request->input('name'),
+                'email' => $user->email,
+                'id_roles' => $user->id_roles,
+            ]);
+
+            // === Bước 4: Trả về Response thành công ===
             return response()->json([
-                'status' => 401, // Unauthorized status code
-                'message' => 'Unauthenticated.',
-            ], 401);
+                'status' => true,
+                'message' => 'Tạo update thành công!',
+                'data' => $data,
+            ], 201);
+        } catch (Exception $e) {
+            // === Bước 5: Xử lý các Exception không mong muốn ===
+            Log::error("Lỗi khi tạo danh mục: " . $e->getMessage(), ['exception' => $e, 'request_data' => $request->all()]);
+            return response()->json([
+                'status' => false,
+                'message' => 'Đã xảy ra lỗi server khi update danh mục. Vui lòng thử lại sau.',
+            ], 500);
         }
     }
 }
