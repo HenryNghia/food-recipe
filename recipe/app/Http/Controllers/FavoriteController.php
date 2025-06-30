@@ -39,7 +39,34 @@ class FavoriteController extends Controller
         }
     }
 
+    public function checkfavorite()
+    {
+        $user = Auth::guard('sanctum')->user();
+        if ($user) {
+            $favorites = Favorite::where('user_id', $user->id)
+                ->select('recipe_id')
+                ->get();
 
+            if ($favorites->isNotEmpty()) {
+                return response()->json([
+                    'status' => 200,
+                    'message' => 'Đã có trong danh sách yêu thích',
+                    'data' => $favorites,
+                ]);
+            } else {
+                return response()->json([
+                    'status' => 201,
+                    'message' => 'Không có trong danh sách yêu thích',
+                    'data' => [],
+                ]);
+            }
+        } else {
+            return response()->json([
+                'status' => 401,
+                'message' => 'Không xác thực',
+            ], 401);
+        }
+    }
     // thêm vào công thức yêu thích
     public function createData(Request $request)
     {
@@ -51,8 +78,9 @@ class FavoriteController extends Controller
 
             if ($exists) {
                 return response()->json([
-                      'status' => 201,
-                      'message' => 'Đã có trong danh sách yêu thích'], 200);
+                    'status' => 201,
+                    'message' => 'Đã có trong danh sách yêu thích'
+                ], 200);
             }
 
             Favorite::create([

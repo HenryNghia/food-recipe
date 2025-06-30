@@ -98,7 +98,6 @@ class AccountController extends Controller
                 'name' => $request->name,
                 'email' => $request->email,
                 'password' => bcrypt($request->password),
-                // Mặc định gán id_roles = 2 khi đăng ký (nếu không có logic khác)
                 'id_roles' => 2,
             ]);
             return response()->json([
@@ -136,7 +135,7 @@ class AccountController extends Controller
                 $value->delete();
             }
             return response()->json([
-                'message'  => 'Đã đăng xuất tất cả thành công!',
+                'message'  => 'Đã đăng xuất thành công!',
                 'status'   => true,
             ]);
         } else {
