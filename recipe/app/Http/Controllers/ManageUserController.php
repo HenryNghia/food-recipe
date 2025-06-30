@@ -63,7 +63,7 @@ class ManageUserController extends Controller
         }
         if ($user->id_roles == 1) {
             $data = User::join('roles', 'users.id_roles', '=', 'roles.id')
-                ->where('id_roles' ,'=', 1)
+                ->where('id_roles', '=', 1)
                 ->select(
                     'roles.name_role',
                     'users.id',
@@ -90,7 +90,7 @@ class ManageUserController extends Controller
         }
     }
 
-      public function GetDataByRoleUser()
+    public function GetDataByRoleUser()
     {
         $user = Auth::guard('sanctum')->user();
 
@@ -103,7 +103,7 @@ class ManageUserController extends Controller
         }
         if ($user->id_roles == 1) {
             $data = User::join('roles', 'users.id_roles', '=', 'roles.id')
-                ->where('id_roles' ,'=', 2)
+                ->where('id_roles', '=', 2)
                 ->select(
                     'roles.name_role',
                     'users.id',
@@ -163,17 +163,26 @@ class ManageUserController extends Controller
     public function deleteData($id)
     {
         try {
-            User::where('id', $id)
-                ->delete();
+            $user = User::find($id);
+            if (!$user) {
+                return response()->json([
+                    'status' => 404,
+                    'message' => 'Người dùng không tồn tại!',
+                ]);
+            }
+
+            $user->delete(); // hoặc $user->forceDelete(); nếu không dùng soft deletes
+
             return response()->json([
-                'status'            =>   200,
-                'message'           =>   'Xóa danh mục thành công!',
+                'status' => 200,
+                'message' => 'Xóa thành công!',
             ]);
         } catch (Exception $e) {
-            Log::info("error", $e);
+            Log::error("Lỗi khi xóa user: " . $e->getMessage());
             return response()->json([
-                'status'            =>   404,
-                'message'           =>   'error',
+                'status' => 500,
+                'message' => 'Đã xảy ra lỗi khi xóa!',
+                'error' => $e->getMessage(),
             ]);
         }
     }
@@ -208,15 +217,15 @@ class ManageUserController extends Controller
 
             $imageUrl = $user->avatar;
             if ($request->hasFile('avatar')) {
-                $imageFile = $request->file('image');
+                $imageFile = $request->file('avatar');
                 $imageName = time() . '_' . $imageFile->getClientOriginalName();
-                $imagePath = $imageFile->storeAs('admin/users', $imageName, 'public');
+                $imagePath = $imageFile->storeAs('user/avatars', $imageName, 'public');
                 $imageUrl = asset('storage/' . $imagePath);
             }
 
             // === Bước 3: Cập nhật bản ghi Recipe trong Database ===
             $user->update([
-                'avtar' => $imageUrl,
+                'avatar' => $imageUrl,
                 'name' => $request->input('name'),
                 'email' => $request->input('email'),
                 'id_roles' => $request->input('id_roles'),

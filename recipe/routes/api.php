@@ -3,6 +3,7 @@
 use App\Http\Controllers\AccountController;
 use App\Http\Controllers\CategoryController;
 use App\Http\Controllers\FavoriteController;
+use App\Http\Controllers\GoogleAuthController;
 use App\Http\Controllers\LevelController;
 use App\Http\Controllers\ManageUserController;
 use App\Http\Controllers\RecipeAdminController;
@@ -29,6 +30,7 @@ Route::post('/check', [AccountController::class, 'checkToken']);
 Route::get('/dang-xuat', [AccountController::class, 'logout']);
 Route::post('/dang-xuat-tat-ca', [AccountController::class, 'logoutAll']);
 Route::delete('/remove-token/{id}', [AccountController::class, 'removeToken']);
+Route::post('/auth/google', [GoogleAuthController::class, 'handleGoogleLogin']);
 
 Route::group([], function () {
     Route::group(['prefix' => '/category'], function () {
@@ -62,6 +64,7 @@ Route::group([], function () {
         Route::put('/update-data', [FavoriteController::class, 'UpdateData']);
         Route::post('/delete-data', [FavoriteController::class, 'DeleteData']);
         Route::post('/check-data', [FavoriteController::class, 'CheckData']);
+        Route::get('/check-data-favorite', [FavoriteController::class, 'checkfavorite']);
     });
 
     Route::group(['prefix' => '/user'], function () {
@@ -88,13 +91,13 @@ Route::group(['prefix' => '/admin'], function () {
     });
     Route::group(['prefix' => '/user'], function () {
         Route::get('/data', [ManageUserController::class, 'GetData']);
-         Route::get('/data-by-admin', [ManageUserController::class, 'GetDataByRoleAdmin']);
-          Route::get('/data-by-user', [ManageUserController::class, 'GetDataByRoleUser']);
+        Route::get('/data-by-admin', [ManageUserController::class, 'GetDataByRoleAdmin']);
+        Route::get('/data-by-user', [ManageUserController::class, 'GetDataByRoleUser']);
         Route::post('/search-data', [ManageUserController::class, 'SearchData']);
         Route::post('/update-data', [ManageUserController::class, 'UpdateData']);
-        Route::post('/delete-data/{id}', [ManageUserController::class, 'DeleteData']);
+        Route::post('/delete-data/{id}', [ManageUserController::class, 'deleteData']);
     });
-     Route::group(['prefix' => '/role'], function () {
+    Route::group(['prefix' => '/role'], function () {
         Route::get('/data', [RoleController::class, 'GetData']);
     });
 });

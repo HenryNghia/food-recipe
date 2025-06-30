@@ -215,8 +215,8 @@ class RecipeController extends Controller
             ->join('levels', 'levels.id', 'recipes.id_level')
             ->join('categories', 'categories.id', 'recipes.id_category')
             ->where(function ($query) use ($keyword) {
-                $query->where('recipes.title', 'like', $keyword)
-                    ->orWhere('categories.name_category', 'like', $keyword);
+                $query->Where('categories.name_category', 'like', $keyword)
+                    ->orwhere('recipes.title', 'like', $keyword);
             })
             ->select(
                 'recipes.id',
@@ -322,7 +322,6 @@ class RecipeController extends Controller
                 'status' => false,
                 'message' => 'Đã xảy ra lỗi server khi tạo công thức. Vui lòng thử lại sau.',
             ], 500);
-
         }
     }
 
